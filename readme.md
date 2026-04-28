@@ -1,6 +1,6 @@
 Assign Co-binding States (R Implementation)
 
-This repository contains an R implementation of the co-binding state assignment pipeline originally developed in Python. The script processes DSMF BEDPE read data and assigns co-binding states based on methylation patterns.
+This repository contains an R implementation of the co-binding state assignment pipeline. The script processes DSMF BEDPE read data and assigns co-binding states based on methylation patterns.
 
 The workflow identifies binding events (e.g., transcription factor binding, nucleosome occupancy) and encodes co-binding relationships between primary and secondary peaks.
 
@@ -54,7 +54,7 @@ Example:
 
 (1,1) → TF-TF → 4
 (2,2) → Nuc-Nuc → 8
-🔧 Parameters
+Parameters
 lflank   → left flank size (bp)
 rflank   → right flank size (bp)
 lextend  → left extension (bp)
