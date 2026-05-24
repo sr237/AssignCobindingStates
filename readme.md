@@ -54,3 +54,20 @@ lflank   → left flank size (bp)
 rflank   → right flank size (bp)
 lextend  → left extension (bp)
 rextend  → right extension (bp)
+
+### Command2: For order_footprints_cobinding
+```r
+# 1. Clean up the environment and any old commandArgs overrides
+rm(list = intersect(c("commandArgs", "args"), ls()))
+
+# 2. Source the script to load its functions into RStudio
+source("R/order_footprints_cobinding.R")
+
+# 3. Call the function cleanly with your direct paths
+order_footprints_cobinding(
+  bedpe_gz = "output/output_150bp.bedpe.gz",
+  roi_id   = "peak_110_4_and_peak_110_6",
+  out_fp   = "output2/final_ordered_footprints.tsv",
+  out_meth = "output2/final_ordered_methylation.tsv"
+)
+```
