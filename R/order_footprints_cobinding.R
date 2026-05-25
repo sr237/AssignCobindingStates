@@ -95,17 +95,28 @@ fp_to_digits <- function(fp_str) {
 }
 
 # Methylated bases observed in this data type
-METH_BASES <- c("A","C","G","T","H","X","Z",
-                "a","c","g","t","h","x","z")
+# METH_BASES <- c("A","C","G","T","H","X","Z",
+#                 "a","c","g","t","h","x","z")
+
+# meth_to_digits <- function(meth_str) {
+#   chars  <- strsplit(meth_str, "", fixed = TRUE)[[1L]]
+#   digits <- integer(length(chars))           # default 0  ('.' -> 0)
+#   digits[chars %in% METH_BASES] <-  2L
+#   digits[chars == "M"]          <- -1L
+#   digits
+# }
+
+METH_UPPER <- c("H","X","Z","A","C","G","T")   # -> 2
+METH_LOWER <- c("h","x","z","a","c","g","t")   # -> 1
 
 meth_to_digits <- function(meth_str) {
   chars  <- strsplit(meth_str, "", fixed = TRUE)[[1L]]
   digits <- integer(length(chars))           # default 0  ('.' -> 0)
-  digits[chars %in% METH_BASES] <-  2L
+  digits[chars %in% METH_UPPER] <- 2L
+  digits[chars %in% METH_LOWER] <- 1L
   digits[chars == "M"]          <- -1L
   digits
 }
-
 
 # ---------------------------------------------------------------------------
 # 3.  Main pipeline function
