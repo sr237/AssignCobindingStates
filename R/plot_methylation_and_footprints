@@ -1,0 +1,265 @@
+## ============================================================
+##  plot_cobinding.R  – corrected version
+##  Fixes:
+##    1. NO double-flip: pass mat as-is, use ylim=c(tot,0) only
+##    2. NO re-ordering: input files are already sorted by pipeline
+##    3. Robust splitting: trimws + mixed tab/space handling
+## ============================================================
+
+args <- commandArgs(trailingOnly = TRUE)
+if (length(args) < 18) stop("Need 18 arguments.")
+
+fp_tsv     <- args[1]
+meth_tsv   <- args[2]
+mnase_file <- args[3]
+out_fp_pdf <- args[6]
+out_me_pdf <- args[7]
+lextend    <- as.integer(args[10])
+rextend    <- as.integer(args[11])
+lflank     <- as.integer(args[12])
+rflank     <- as.integer(args[13])
+roi_id     <- args[17]
+bedpe_file <- args[18]
+
+STATE_LABELS <- c(
+  "0"="D-D","1"="D-T","2"="D-N",
+  "3"="T-D","4"="T-T","5"="T-N",
+  "6"="N-D","7"="N-T","8"="N-N",
+  "9"="X-D","10"="X-T","11"="X-N",
+  "12"="D-X","13"="T-X","14"="N-X","15"="X-X"
+)
+
+## ════════════════════════════════════════════════════════════
+## 1. read_matrix
+##    - select_valid_states.py 9: keep state in 0..8
+##    - awk '{$1=""; print $0}': drop token column
+##    - Input files are ALREADY sorted by pipeline; do NOT reorder
+##    - Robust split: trim whitespace, handle tabs
+## ════════════════════════════════════════════════════════════
+read_matrix <- function(path) {
+  if (!file.exists(path)) stop("File not found: ", path)
+  raw    <- readLines(path, warn = FALSE)
+  raw    <- raw[nzchar(trimws(raw))]
+  token  <- sub("\t.*", "", raw)
+  states <- sub(".*#", "", token)
+  keep   <- states %in% as.character(0:8)
+  raw    <- raw[keep]
+  states <- states[keep]
+  ## drop token column; split on tab, trim each field
+  num_str <- sub("^[^\t]*\t", "", raw)
+  mat <- do.call(rbind, lapply(num_str, function(x) {
+    fields <- strsplit(trimws(x), "\t")[[1]]
+    as.integer(trimws(fields))
+  }))
+  list(mat = mat, states = states)
+}
+
+## ════════════════════════════════════════════════════════════
+## 2. build_state_counts
+##    Replicates: awk -F '[\t#]' '{print $2}' | sort -n | uniq -c
+##    Uses states vector as-is (already in pipeline order)
+##    Counts consecutive runs to match gnuplot label positions
+## ════════════════════════════════════════════════════════════
+build_state_counts <- function(states) {
+  tbl <- sort(table(as.integer(states)))
+  tbl <- tbl[tbl > 0]
+  data.frame(cnt = as.integer(tbl),
+             cl  = names(tbl),
+             stringsAsFactors = FALSE)
+}
+
+## ════════════════════════════════════════════════════════════
+## 3. read_mnase
+##    Pre-filtered file: col1=position, col2=signal
+## ════════════════════════════════════════════════════════════
+read_mnase <- function(path) {
+  if (!file.exists(path)) stop("MNase file not found: ", path)
+  con <- if (grepl("\\.gz$", path)) gzfile(path, "rt") else file(path, "rt")
+  raw <- readLines(con, warn = FALSE)
+  close(con)
+  raw <- raw[nzchar(trimws(raw))]
+  mat <- do.call(rbind, strsplit(trimws(raw), "\t"))
+  data.frame(x = as.numeric(mat[,1]), y = as.numeric(mat[,2]))
+}
+
+## ════════════════════════════════════════════════════════════
+## 4. get_peak_distance
+##    grep -w roi bedpe | awk '{print $5 - $2 + 1}'
+##    d_l = d - 15,  d_r = d + 15
+## ════════════════════════════════════════════════════════════
+get_peak_distance <- function(path, roi) {
+  if (!file.exists(path)) {
+    message("[WARN] bedpe not found, using d=85")
+    return(list(d=85L, d_l=70L, d_r=100L))
+  }
+  raw <- readLines(path, warn = FALSE)
+  hit <- grep(paste0("\\b", roi, "\\b"), raw, value = TRUE)
+  if (!length(hit)) {
+    message("[WARN] roi not found in bedpe, using d=85")
+    return(list(d=85L, d_l=70L, d_r=100L))
+  }
+  f <- strsplit(trimws(hit[1]), "\t")[[1]]
+  d <- as.integer(f[5]) - as.integer(f[2]) + 1L
+  list(d = d, d_l = d - 15L, d_r = d + 15L)
+}
+
+## ════════════════════════════════════════════════════════════
+## 5. Palettes from gplt files
+##
+##  footprint_params.gplt:
+##    palette defined (0 white, 0.499 white, 0.5 #f0f0f0,
+##                     0.99 #f0f0f0, 1 #3182bd)
+##    zlim=c(-1,1): value -1 → 0.0 → white
+##                  value  0 → 0.5 → #f0f0f0
+##                  value  1 → 1.0 → #3182bd
+##
+##  methylation_params.gplt:
+##    palette defined (0 white, 0.3299 white,
+##                     0.33333 #f0f0f0, 0.6599 #f0f0f0,
+##                     0.6666 #636363, 0.99 #636363, 1 #de2d26)
+##    zlim=c(-1,1): value -1 → 0.0 → white
+##                  value  0 → 0.5 → #636363
+##                  value  1 → 1.0 → #de2d26
+## ════════════════════════════════════════════════════════════
+make_fp_palette <- function(n = 512) {
+  b1 <- round(n * 0.499)   # white   → value -1 to just below 0
+  b2 <- round(n * 0.490)   # #f0f0f0 → value 0
+  b3 <- n - b1 - b2        # #3182bd → value 1
+  c(rep("white",   b1),
+    rep("#f0f0f0", b2),
+    rep("#3182bd", max(b3, 1)))
+}
+
+make_me_palette <- function(n = 512) {
+  b1 <- round(n * 0.333)   # white
+  b2 <- round(n * 0.327)   # #f0f0f0
+  b3 <- round(n * 0.327)   # #636363
+  b4 <- n - b1 - b2 - b3   # #de2d26
+  c(rep("white",   b1),
+    rep("#f0f0f0", b2),
+    rep("#636363", b3),
+    rep("#de2d26", max(b4, 1)))
+}
+
+## ════════════════════════════════════════════════════════════
+## 6. draw_page
+##    FIX 1: image() receives mat as-is (NOT flipped).
+##            ylim=c(tot,0) alone inverts Y so row 1 is at top.
+##            t(mat) transposes for image() column-major requirement.
+##    FIX 2: No order() call – matrix rows already in correct order.
+## ════════════════════════════════════════════════════════════
+draw_page <- function(mat, mnase_df, state_counts, peak_dist,
+                      lextend, rextend, lflank, rflank,
+                      pal, out_pdf) {
+  
+  tot  <- nrow(mat)
+  xlim <- c(-lextend, rextend)
+  d_l  <- peak_dist$d_l
+  d_r  <- peak_dist$d_r
+  
+  dir.create(dirname(out_pdf), recursive = TRUE, showWarnings = FALSE)
+  pdf(out_pdf, width = 4.5, height = 7.5)
+  layout(matrix(c(1,2), nrow=2), heights = c(1, 11))
+  
+  ## ── Panel 1: MNase ─────────────────────────────────────────
+  par(mar = c(0, 6, 1, 1), xaxs = "i", yaxs = "i")
+  sub_m <- mnase_df[mnase_df$x >= xlim[1] & mnase_df$x <= xlim[2], ]
+  ymax  <- max(sub_m$y, na.rm = TRUE) * 1.05
+  
+  plot(sub_m$x, sub_m$y,
+       type = "l", col = "#31a354", lwd = 2,
+       xlim = xlim, ylim = c(0, ymax),
+       xaxt = "n", yaxt = "n",
+       xlab = "", ylab = "", bty = "n")
+  rect(-lflank, 0,   rflank, ymax, col=rgb(0,0,0,0.10), border=NA)
+  rect(d_l,     0,   d_r,    ymax, col=rgb(0,0,0,0.10), border=NA)
+  legend("topleft", legend="MNase", col="#31a354", lwd=2, bty="n", cex=0.7)
+  
+  ## ── Panel 2: heatmap ───────────────────────────────────────
+  par(mar = c(3, 6, 0, 1), xaxs = "i", yaxs = "i")
+  
+  n_cols <- ncol(mat)
+  col_x  <- seq(-lextend, rextend, length.out = n_cols)
+  row_y  <- seq_len(tot)
+  
+  ## FIX 1: t(mat) only – NO row flip. ylim=c(tot,0) puts row 1 at top.
+  ## image(x, y, z): z[i,j] plotted at x=col_x[i], y=row_y[j]
+  ## With ylim=c(tot,0): y=1 is at top, y=tot is at bottom.
+  ## So row 1 of mat (first molecule) appears at top. Correct.
+  image(col_x, row_y,
+        t(mat),
+        col  = pal,
+        zlim = c(-1, 1),
+        xlim = xlim,
+        ylim = c(tot, 0),
+        xaxt = "n", yaxt = "n",
+        xlab = "", ylab = "",
+        bty  = "o")
+  
+  axis(1, cex.axis = 0.8, tck = 0)
+  
+  usr <- par("usr")
+  rect(-lflank, usr[3], rflank, usr[4], col=rgb(0,0,0,0.10), border=NA)
+  rect(d_l,     usr[3], d_r,    usr[4], col=rgb(0,0,0,0.10), border=NA)
+  
+  ## top border
+  segments(xlim[1], 0, xlim[2], 0, col="#636363", lwd=1.5)
+  
+  ## state dividers + labels
+  cumrow <- 0L
+  prev   <- 0L
+  for (i in seq_len(nrow(state_counts))) {
+    cnt    <- state_counts$cnt[i]
+    cl     <- state_counts$cl[i]
+    cumrow <- cumrow + cnt
+    mid    <- (prev + cumrow) / 2.0
+    lbl    <- STATE_LABELS[as.character(cl)]
+    if (is.na(lbl)) lbl <- cl
+    segments(xlim[1], cumrow, xlim[2], cumrow, col="#636363", lwd=1.5)
+    mtext(sprintf("n = %d (%s)", cnt, lbl),
+          side=2, at=mid, las=1, cex=0.50, line=0.1, adj=1)
+    prev <- cumrow
+  }
+  
+  dev.off()
+  message("Written: ", out_pdf)
+}
+
+## ════════════════════════════════════════════════════════════
+## 7. MAIN
+##    FIX 2: NO order() on matrices – already sorted by pipeline
+## ════════════════════════════════════════════════════════════
+
+message("Reading footprint matrix: ", fp_tsv)
+fp <- read_matrix(fp_tsv)
+message("  rows=", nrow(fp$mat), " cols=", ncol(fp$mat))
+
+message("Reading methylation matrix: ", meth_tsv)
+meth <- read_matrix(meth_tsv)
+message("  rows=", nrow(meth$mat), " cols=", ncol(meth$mat))
+
+## state counts from footprint file (shell uses $1 for count loop)
+## NO sorting of matrix rows here
+message("State count table:")
+sc <- build_state_counts(fp$states)
+print(sc)
+
+message("Reading MNase: ", mnase_file)
+mnase <- read_mnase(mnase_file)
+message("  rows=", nrow(mnase), " x=[", min(mnase$x), ",", max(mnase$x), "]")
+
+message("Peak distance from bedpe:")
+pd <- get_peak_distance(bedpe_file, roi_id)
+message(sprintf("  d=%d  d_l=%d  d_r=%d", pd$d, pd$d_l, pd$d_r))
+
+message("Drawing footprint PDF: ", out_fp_pdf)
+draw_page(mat=fp$mat, mnase_df=mnase, state_counts=sc, peak_dist=pd,
+          lextend=lextend, rextend=rextend, lflank=lflank, rflank=rflank,
+          pal=make_fp_palette(), out_pdf=out_fp_pdf)
+
+message("Drawing methylation PDF: ", out_me_pdf)
+draw_page(mat=meth$mat, mnase_df=mnase, state_counts=sc, peak_dist=pd,
+          lextend=lextend, rextend=rextend, lflank=lflank, rflank=rflank,
+          pal=make_me_palette(), out_pdf=out_me_pdf)
+
+message("Done.")
