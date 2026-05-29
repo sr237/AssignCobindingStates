@@ -83,3 +83,30 @@ args <- c(
 commandArgs <- function(trailingOnly = TRUE) args
 source("R/extended_fragments_for_cobinding.R")
 ```
+
+### Command4: For final method.r
+```r
+setwd("C:/Users/hp/Downloads/SMTrackR-main/SMTrackR-main")
+
+# Install the package from source
+install.packages(".", repos = NULL, type = "source")
+
+# Then load and test
+library(SMTrackR)
+
+result <- plotCobindingFootprints(
+    chromosome = "chr2L",
+    start1     = 19155173,
+    end1       = 19155251,
+    start2     = 19155251,
+    end2       = 19155329,
+    lflank     = 15L,
+    rflank     = 15L,
+    lextend    = 300L,
+    rextend    = 300L,
+    mnase_file = NULL,
+    label      = "peak_110_4_and_peak_110_6",
+    bigBed     = "inst/extdata/demo_dsmf.bb",   # <-- was demo.bb, needs to be demo_dsmf.bb
+    target_dir = "results/cobinding"
+)
+```
