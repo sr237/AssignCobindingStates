@@ -72,6 +72,36 @@ order_footprints_cobinding(
 )
 ```
 
+### Command 3: For plotting
+```r
+rm(list = intersect(c("commandArgs", "args"), ls()))
+
+commandArgs <- function(trailingOnly = TRUE) {
+    c(
+        "output2/final_ordered_footprints110R.tsv",
+        "output2/final_ordered_methylation110R.tsv",
+        "mnase_peaks/peak_229.tsv",
+        "dummy4",
+        "dummy5",
+        "plots/footprints110.pdf",
+        "plots/methylation110.pdf",
+        "dummy8",
+        "dummy9",
+        "150",
+        "150",
+        "35",
+        "35",
+        "dummy14",
+        "dummy15",
+        "dummy16",
+        "peak_110_4_and_peak_110_6",
+        "output/output_150bp.bedpe"
+    )
+}
+
+source("R/plot_footprint_and_methylation.R")
+```
+
 ### Command4: For extended_fragments_for_cobiding
 ```r
 args <- c(
@@ -84,7 +114,7 @@ commandArgs <- function(trailingOnly = TRUE) args
 source("R/extended_fragments_for_cobinding.R")
 ```
 
-### Command4: For final method.r
+### Command 5: For final method.r
 ```r
 setwd("C:/Users/hp/Downloads/SMTrackR-main/SMTrackR-main")
 
