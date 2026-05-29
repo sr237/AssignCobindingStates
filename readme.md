@@ -71,3 +71,15 @@ order_footprints_cobinding(
   out_meth = "output2/final_ordered_methylation.tsv"
 )
 ```
+
+### Command4: For extended_fragments_for_cobiding
+```r
+args <- c(
+    "input_bed/suppressed_merged_demo_S2_to_example_cobinding_spanning_lf_15_rf_15.bedpe.gz",
+    "15", "15", "300", "300",
+    "ExtendedOutput/extended_fragments.bed.gz",
+    "ExtendedOutput/extended_fragments.verbose.bed.gz"
+)
+commandArgs <- function(trailingOnly = TRUE) args
+source("R/extended_fragments_for_cobinding.R")
+```
