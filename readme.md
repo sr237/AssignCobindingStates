@@ -119,11 +119,16 @@ source("R/extended_fragments_for_cobinding.R")
 setwd("C:/Users/hp/Downloads/SMTrackR-main/SMTrackR-main")
 
 # Install the package from source
-install.packages(".", repos = NULL, type = "source")
+# Step 1: Detach the installed library version
+detach("package:SMTrackR", unload = TRUE)
 
-# Then load and test
-library(SMTrackR)
+# Step 2: Load directly from source (includes all your new files)
+devtools::load_all("C:/Users/hp/Downloads/SMTrackR-main/SMTrackR-main/")
 
+# Step 3: Confirm function exists
+exists("plotCobindingFootprints")   # must return TRUE
+
+# Step 4: Now run your call
 result <- plotCobindingFootprints(
     chromosome = "chr2L",
     start1     = 19155173,
@@ -136,7 +141,7 @@ result <- plotCobindingFootprints(
     rextend    = 300L,
     mnase_file = NULL,
     label      = "peak_110_4_and_peak_110_6",
-    bigBed     = "inst/extdata/demo_dsmf.bb",   # <-- was demo.bb, needs to be demo_dsmf.bb
+    bigBed     = "inst/extdata/demo_dsmf.bb",
     target_dir = "results/cobinding"
 )
 ```
