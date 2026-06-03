@@ -131,17 +131,16 @@ exists("plotCobindingFootprints")   # must return TRUE
 # Step 4: Now run your call
 result <- plotCobindingFootprints(
     chromosome = "chr2L",
-    start1     = 19155173,
-    end1       = 19155251,
-    start2     = 19155251,
-    end2       = 19155329,
+    start1     = 19155158,   # 19155173 - 15
+    end1       = 19155188,   
+    start2     = 19155251,   
+    end2       = 19155266,
     lflank     = 15L,
     rflank     = 15L,
-    lextend    = 300L,
-    rextend    = 300L,
+    lextend    = 150L,
+    rextend    = 150L,
     mnase_file = NULL,
     label      = "peak_110_4_and_peak_110_6",
-    bigBed     = "inst/extdata/demo_dsmf.bb",
-    target_dir = "results/cobinding"
+    target_dir = "results/cobinding",
 )
 ```
