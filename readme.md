@@ -128,10 +128,12 @@ devtools::load_all("C:/Users/hp/Downloads/SMTrackR-main/SMTrackR-main/")
 # Step 3: Confirm function exists
 exists("plotCobindingFootprints")   # must return TRUE
 
+#peak_110_4: chr2L:19155173-19155251
+#peak_110_6: chr2L:19155251-19155329
 # Step 4: Now run your call
 result <- plotCobindingFootprints(
     chromosome = "chr2L",
-    start1     = 19155158,   # 19155173 - 15
+    start1     = 19155173,   
     end1       = 19155188,   
     start2     = 19155251,   
     end2       = 19155266,
